@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AUTHENTIC</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0a0e14">
+<style>
+html,body{margin:0;height:100%;background:#0a0e14;color:#eaf0f7;font-family:sans-serif}
+iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
+#msg{padding:24px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="msg" hidden></div>
+<iframe id="app" title="AUTHENTIC" allow="clipboard-write"></iframe>
+<script>
+/* STEP 1: replace the text below with your Apps Script web app link
+   (the one that ends with /exec). Keep the quote marks. */
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbw8YXfqP5RXuZpUAizya0xK5eUSreSS7xINBqYMOQ2lrbPYQFRr7NQVRK6SLa4IV3O4/exec';
+
+var frame = document.getElementById('app');
+if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(EXEC_URL)) {
+  frame.hidden = true;
+  var m = document.getElementById('msg');
+  m.hidden = false;
+  m.textContent = 'Open index.html and put your Apps Script /exec link in EXEC_URL.';
+} else {
+  frame.src = EXEC_URL;
+}
+
+/* Chrome offers its own install window through this event. */
+var deferred = null;
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; });
+window.addEventListener('appinstalled', function () { deferred = null; });
+
+/* The app's "Install App" button sends a message here. */
+window.addEventListener('message', function (e) {
+  var d = e.data;
+  if (!d || d.authentic !== 'install') return;
+  var ok = false;
+  try {
+    var h = new URL(e.origin).hostname;
+    ok = /(^|\.)googleusercontent\.com$/.test(h) || /(^|\.)google\.com$/.test(h) || e.origin === new URL(EXEC_URL).origin;
+  } catch (x) { ok = false; }
+  if (!ok || !deferred) return;
+  var p = deferred;
+  deferred = null;
+  p.prompt();
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+</script>
+</body>
+</html>
