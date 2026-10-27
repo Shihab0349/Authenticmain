@@ -30,6 +30,7 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
   <button id="pushyes" type="button">Turn on</button>
   <button id="pushno" type="button">Not now</button>
 </div>
+<pre id="dbg" hidden style="position:fixed;left:8px;right:8px;bottom:8px;z-index:20;margin:0;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.85);color:#9fe8c4;font-size:12px;line-height:1.5;white-space:pre-wrap"></pre>
 <iframe id="app" title="AUTHENTIC" allow="clipboard-write"></iframe>
 <script>
 /* STEP 1: replace the text below with your Apps Script web app link
@@ -77,6 +78,17 @@ function noRecently() {
   try { var t = Number(localStorage.getItem('pushNo') || 0); return t && Date.now() - t < 7 * 86400000; }
   catch (e) { return false; }
 }
+var DBG = location.hash === '#debug';
+var dbgLast = 'no message from the app yet';
+function dbgShow() {
+  if (!DBG) return;
+  var d = document.getElementById('dbg');
+  d.hidden = false;
+  d.textContent = 'App ID ok: ' + pushOn + '\nlogged-in id: ' + wantUid +
+    '\nphone permission: ' + nativePerm() + '\nsnoozed 7 days: ' + noRecently() +
+    '\nOneSignal loaded: ' + !!window.OneSignal + '\nlast message: ' + dbgLast;
+}
+if (DBG) setInterval(dbgShow, 1000);
 function hideBar() { bar.hidden = true; }
 function showBar() {
   if (!pushOn || !wantUid || nativePerm() !== 'default' || noRecently()) { hideBar(); return; }
@@ -134,6 +146,7 @@ if (pushOn) {
 window.addEventListener('message', function (e) {
   var d = e.data;
   if (!d || typeof d !== 'object' || !d.authentic) return;
+  dbgLast = d.authentic + ' from ' + e.origin + (okOrigin(e.origin) ? ' (accepted)' : ' (REJECTED)');
   if (!okOrigin(e.origin)) return;
   if (d.authentic === 'install') {
     if (!deferred) return;
