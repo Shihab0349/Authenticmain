@@ -153,6 +153,9 @@ window.addEventListener('message', function (e) {
     var p = deferred;
     deferred = null;
     p.prompt();
+  } else if (d.authentic === 'exit') {
+    try { window.close(); } catch (x) { /* the phone may not allow it */ }
+    try { history.back(); } catch (x) { /* ignore */ }
   } else if (d.authentic === 'push') {
     if (typeof d.uid === 'string' && /^[A-Za-z0-9_-]{4,40}$/.test(d.uid)) { wantUid = d.uid; syncPush(); }
   } else if (d.authentic === 'pushOut') {
