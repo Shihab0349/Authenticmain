@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AUTHENTIC</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="dns-prefetch" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -12,34 +15,17 @@
 html,body{margin:0;height:100%;background:#0a0e14;color:#eaf0f7;font-family:sans-serif}
 iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
 #msg{padding:24px;line-height:1.6}
-#pushbar{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:10;
-  display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;
-  background:#151d29;border:1px solid #22c37b;color:#eaf0f7;font-size:14px;line-height:1.35;
-  box-shadow:0 6px 24px rgba(0,0,0,.45)}
-#pushbar[hidden]{display:none}
-#pushbar span{flex:1}
-#pushbar button{border:0;border-radius:10px;padding:8px 12px;font-size:14px;cursor:pointer}
-#pushyes{background:#22c37b;color:#04140c;font-weight:bold}
-#pushno{background:transparent;color:#9fb0c3}
+#boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;letter-spacing:2px;pointer-events:none;transition:opacity .3s}
 </style>
 </head>
 <body>
 <div id="msg" hidden></div>
-<div id="pushbar" hidden>
-  <span id="pushtxt"></span>
-  <button id="pushyes" type="button">Turn on</button>
-  <button id="pushno" type="button">Not now</button>
-</div>
-<pre id="dbg" hidden style="position:fixed;left:8px;right:8px;bottom:8px;z-index:20;margin:0;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.85);color:#9fe8c4;font-size:12px;line-height:1.5;white-space:pre-wrap"></pre>
+<div id="boot">AUTHENTIC</div>
 <iframe id="app" title="AUTHENTIC" allow="clipboard-write"></iframe>
 <script>
 /* STEP 1: replace the text below with your Apps Script web app link
    (the one that ends with /exec). Keep the quote marks. */
 var EXEC_URL = 'https://script.google.com/macros/s/AKfycbw8YXfqP5RXuZpUAizya0xK5eUSreSS7xINBqYMOQ2lrbPYQFRr7NQVRK6SLa4IV3O4/exec';
-
-/* STEP 2 (phone notifications): paste your OneSignal App ID between the quotes.
-   The App ID is not secret. The REST API key must NEVER be put in this file. */
-var ONESIGNAL_APP_ID = 'e56f84c0-eb96-4e32-899d-d89edfc5d6c3';
 
 var frame = document.getElementById('app');
 if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(EXEC_URL)) {
@@ -49,118 +35,30 @@ if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(EXEC_URL)) {
   m.textContent = 'Open index.html and put your Apps Script /exec link in EXEC_URL.';
 } else {
   frame.src = EXEC_URL;
+  frame.addEventListener('load', function () {
+    var b = document.getElementById('boot');
+    if (b) { b.style.opacity = '0'; setTimeout(function () { b.remove(); }, 400); }
+  });
 }
 
-/* Only the app (Google's domains) may send messages to this page. */
-function okOrigin(origin) {
-  try {
-    var h = new URL(origin).hostname;
-    return /(^|\.)googleusercontent\.com$/.test(h) || /(^|\.)google\.com$/.test(h) || origin === new URL(EXEC_URL).origin;
-  } catch (x) { return false; }
-}
-
-/* ---------- Install button ---------- */
 /* Chrome offers its own install window through this event. */
 var deferred = null;
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; });
 window.addEventListener('appinstalled', function () { deferred = null; });
 
-/* ---------- Phone notifications (OneSignal) ---------- */
-var pushOn = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ONESIGNAL_APP_ID);
-var wantUid = null;      // null = nothing known yet, '' = logged out, otherwise the user id
-var doneUid = null;      // the id already given to OneSignal
-var initP = null;
-var bar = document.getElementById('pushbar');
-
-function pushBase() { return location.pathname.replace(/[^\/]*$/, ''); }   // '/' or '/repo/'
-function nativePerm() { return ('Notification' in window) ? Notification.permission : 'denied'; }
-function noRecently() {
-  try { var t = Number(localStorage.getItem('pushNo') || 0); return t && Date.now() - t < 7 * 86400000; }
-  catch (e) { return false; }
-}
-var DBG = location.hash === '#debug';
-var dbgLast = 'no message from the app yet';
-function dbgShow() {
-  if (!DBG) return;
-  var d = document.getElementById('dbg');
-  d.hidden = false;
-  d.textContent = 'App ID ok: ' + pushOn + '\nlogged-in id: ' + wantUid +
-    '\nphone permission: ' + nativePerm() + '\nsnoozed 7 days: ' + noRecently() +
-    '\nOneSignal loaded: ' + !!window.OneSignal + '\nlast message: ' + dbgLast;
-}
-if (DBG) setInterval(dbgShow, 1000);
-function hideBar() { bar.hidden = true; }
-function showBar() {
-  if (!pushOn || !wantUid || nativePerm() !== 'default' || noRecently()) { hideBar(); return; }
-  document.getElementById('pushtxt').textContent = 'Get class and notice alerts on this phone?';
-  bar.hidden = false;
-}
-function whenReady(fn) {
-  window.OneSignalDeferred.push(async function (OS) {
-    try { await initP; fn(OS); } catch (e) { /* push is optional */ }
-  });
-}
-function syncPush() {
-  if (!pushOn || wantUid === null) return;
-  if (wantUid && wantUid !== doneUid) {
-    var u = wantUid; doneUid = u;
-    whenReady(function (OS) {
-      OS.login(u);
-      if (nativePerm() === 'granted' && OS.User && OS.User.PushSubscription && !OS.User.PushSubscription.optedIn) {
-        OS.User.PushSubscription.optIn();
-      }
-    });
-  } else if (wantUid === '' && doneUid) {
-    doneUid = null;
-    whenReady(function (OS) { OS.logout(); });
-  }
-  showBar();
-}
-
-if (pushOn) {
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  var sdk = document.createElement('script');
-  sdk.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
-  sdk.defer = true;
-  document.head.appendChild(sdk);
-  window.OneSignalDeferred.push(function (OS) {
-    var b = pushBase();
-    initP = OS.init({
-      appId: ONESIGNAL_APP_ID,
-      serviceWorkerPath: b.slice(1) + 'push/onesignal/OneSignalSDKWorker.js',
-      serviceWorkerParam: { scope: b + 'push/onesignal/' }
-    });
-    return initP;
-  });
-  document.getElementById('pushyes').onclick = function () {
-    hideBar();
-    try { window.OneSignal.Notifications.requestPermission(); } catch (e) {}
-  };
-  document.getElementById('pushno').onclick = function () {
-    try { localStorage.setItem('pushNo', String(Date.now())); } catch (e) {}
-    hideBar();
-  };
-}
-
-/* ---------- Messages from the app ---------- */
+/* The app's "Install App" button sends a message here. */
 window.addEventListener('message', function (e) {
   var d = e.data;
-  if (!d || typeof d !== 'object' || !d.authentic) return;
-  dbgLast = d.authentic + ' from ' + e.origin + (okOrigin(e.origin) ? ' (accepted)' : ' (REJECTED)');
-  if (!okOrigin(e.origin)) return;
-  if (d.authentic === 'install') {
-    if (!deferred) return;
-    var p = deferred;
-    deferred = null;
-    p.prompt();
-  } else if (d.authentic === 'exit') {
-    try { window.close(); } catch (x) { /* the phone may not allow it */ }
-    try { history.back(); } catch (x) { /* ignore */ }
-  } else if (d.authentic === 'push') {
-    if (typeof d.uid === 'string' && /^[A-Za-z0-9_-]{4,40}$/.test(d.uid)) { wantUid = d.uid; syncPush(); }
-  } else if (d.authentic === 'pushOut') {
-    wantUid = ''; syncPush();
-  }
+  if (!d || d.authentic !== 'install') return;
+  var ok = false;
+  try {
+    var h = new URL(e.origin).hostname;
+    ok = /(^|\.)googleusercontent\.com$/.test(h) || /(^|\.)google\.com$/.test(h) || e.origin === new URL(EXEC_URL).origin;
+  } catch (x) { ok = false; }
+  if (!ok || !deferred) return;
+  var p = deferred;
+  deferred = null;
+  p.prompt();
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
