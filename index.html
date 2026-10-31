@@ -15,12 +15,13 @@
 html,body{margin:0;height:100%;background:#0a0e14;color:#eaf0f7;font-family:sans-serif}
 iframe{position:fixed;inset:0;width:100%;height:100%;border:0}
 #msg{padding:24px;line-height:1.6}
-#boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;letter-spacing:2px;pointer-events:none;transition:opacity .3s}
+#boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;transition:opacity .3s;background:#0a0e14}
+#boot img{width:132px;height:132px;border-radius:50%;box-shadow:0 0 0 3px #0a0e14,0 0 0 5px #0e8a53}
 </style>
 </head>
 <body>
 <div id="msg" hidden></div>
-<div id="boot">AUTHENTIC</div>
+<div id="boot"><img src="icon-192.png" alt="AUTHENTIC" width="132" height="132"></div>
 <iframe id="app" title="AUTHENTIC" allow="clipboard-write"></iframe>
 <script>
 /* STEP 1: replace the text below with your Apps Script web app link
@@ -46,19 +47,25 @@ var deferred = null;
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; });
 window.addEventListener('appinstalled', function () { deferred = null; });
 
-/* The app's "Install App" button sends a message here. */
+/* The app talks to this page by messages:
+   'hi'      -> this page answers 'hello' with its own link (the app learns where it can be installed from)
+   'install' -> Chrome's install window opens; the app is told 'install-ok', or 'install-na' when Chrome gave no window */
+function reply(e, msg) { try { e.source.postMessage(msg, e.origin); } catch (x) { /* the app shows the manual steps */ } }
 window.addEventListener('message', function (e) {
   var d = e.data;
-  if (!d || d.authentic !== 'install') return;
+  if (!d || (d.authentic !== 'install' && d.authentic !== 'hi')) return;
   var ok = false;
   try {
     var h = new URL(e.origin).hostname;
     ok = /(^|\.)googleusercontent\.com$/.test(h) || /(^|\.)google\.com$/.test(h) || e.origin === new URL(EXEC_URL).origin;
   } catch (x) { ok = false; }
-  if (!ok || !deferred) return;
+  if (!ok) return;
+  if (d.authentic === 'hi') { reply(e, { authentic: 'hello', url: location.href.split('#')[0].split('?')[0] }); return; }
+  if (!deferred) { reply(e, { authentic: 'install-na' }); return; }
   var p = deferred;
   deferred = null;
   p.prompt();
+  reply(e, { authentic: 'install-ok' });
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
